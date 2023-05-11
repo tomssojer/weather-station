@@ -37,13 +37,14 @@ static void set_ap(void) {
 	printf("Wifi ssid: %s\n", config.ssid);
 }
 
-void blink_led_on_traffic(void *pvParameters) {
-        
+void receive_data_task(void *pvParameters) {
+        gpio_enable(CS_NRF, GPIO_INPUT);
+
         radio.begin();
         radio.setChannel(CHANNEL);
         radio.openReadingPipe(1, address);
         radio.startListening();
-	gpio_enable(GPIO_LED, GPIO_OUTPUT);
+	
 	while (1) {
 		if (radio.available()) {
 			radio.read(&rx_data, sizeof(float));
@@ -63,17 +64,15 @@ static void bmp_task(void *pvParameters)  {
        // BMP280 configuration
         bmp280_params_t params;
         bmp280_init_default_params(&params);
-        params.mode = BMP280_MODE_FORCED;
         bmp280_dev.i2c_dev.bus = BUS_I2C;
         bmp280_dev.i2c_dev.addr = BMP280_I2C_ADDRESS_0;
         bmp280_init(&bmp280_dev, &params);
 
         float temperature, pressure;
-        gpio_enable(GPIO_LED, GPIO_OUTPUT);	
 
         while (1) {
 
-                vTaskDelay(pdMS_TO_TICKS(10000));
+                vTaskDelay(pdMS_TO_TICKS(5000));
                 temperature = read_bmp(BMP280_TEMPERATURE);
                 pressure = read_bmp(BMP280_PRESSURE);
 
@@ -88,10 +87,12 @@ extern "C" void user_init(void) {
 	
 	set_ap();
 
+	i2c_init(BUS_I2C, SCL, SDA, I2C_FREQ_100K);
 	gpio_enable(SCL, GPIO_OUTPUT);
-        gpio_enable(CS_NRF, GPIO_OUTPUT);
+	gpio_enable(GPIO_LED, GPIO_OUTPUT);
+	gpio_write(GPIO_LED, 1);
 
-	xTaskCreate(bmp_task, "BMP task", 512, NULL, 2, NULL);
-	xTaskCreate(blink_led_on_traffic, "Blink LED", 512, NULL, 2, NULL);	
+	xTaskCreate(&bmp_task, "Measure data", 512, NULL, 2, NULL);
+	xTaskCreate(receive_data_task, "Listen to radio for incoming data", 512, NULL, 2, NULL);	
 }
 

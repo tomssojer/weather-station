@@ -15,15 +15,15 @@
 
 // I2C
 #define BUS_I2C 0
-#define SCL 5
-#define SDA 4
+#define SCL 14
+#define SDA 12
 
 // nrf24
 #define CE_NRF 3
 #define CS_NRF 0
 #define CHANNEL 33
 
-static RF24 radio(CE_NRF, CS_NRF);
+RF24 radio(CE_NRF, CS_NRF);
 const uint8_t address[] = {0x01, 0x23, 0x45, 0x67, 0x89};
 
 bmp280_t bmp280_dev;
@@ -32,6 +32,7 @@ typedef enum {
 } bmp280_quantity;
 
 float read_bmp(bmp280_quantity quantity) {
+	i2c_init(BUS_I2C, SCL, SDA, I2C_FREQ_100K);
         float temperature, pressure;
 
         // wait for measurement to complete
@@ -43,5 +44,6 @@ float read_bmp(bmp280_quantity quantity) {
         } else if (quantity == BMP280_PRESSURE) {
                 return pressure;
         }
+
         return 0;
 }

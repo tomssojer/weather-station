@@ -13,21 +13,31 @@ static void wifi_connect(void) {
         sdk_wifi_station_connect();	
 }
 
+static void send_data(float temp, float press) {
+	gpio_enable(CS_NRF, GPIO_INPUT);
+
+	radio.begin();
+	radio.setChannel(CHANNEL);
+	radio.openWritingPipe(address);
+	radio.stopListening();
+	radio.write(&temp, sizeof(temp));
+	radio.write(&press, sizeof(press));
+
+	gpio_disable(CS_NRF);
+}
+
 static void bmp_task(void *pvParameters) {
 
        // BMP280 configuration
         bmp280_params_t params;
         bmp280_init_default_params(&params);
-	params.mode = BMP280_MODE_FORCED;	
         bmp280_dev.i2c_dev.bus = BUS_I2C;
         bmp280_dev.i2c_dev.addr = BMP280_I2C_ADDRESS_0;
         bmp280_init(&bmp280_dev, &params);
 
 	float temperature, pressure;	
-	gpio_enable(GPIO_LED, GPIO_OUTPUT);
 	
 	while (1) {
-
 		temperature = read_bmp(BMP280_TEMPERATURE);
 		pressure = read_bmp(BMP280_PRESSURE);
 
@@ -35,31 +45,23 @@ static void bmp_task(void *pvParameters) {
 		printf("Pressure on transmitter: %f mBar\n", 0.01*pressure);		
 
 		gpio_write(GPIO_LED, 0);
-		radio.powerUp();
-		radio.stopListening();
-		radio.write(&temperature, sizeof(temperature));
-		radio.write(&pressure, sizeof(pressure));
-		radio.powerDown();
+		send_data(temperature, pressure);
 
 		vTaskDelay(pdMS_TO_TICKS(500));
 		gpio_write(GPIO_LED, 1);	
-		vTaskDelay(pdMS_TO_TICKS(10000));
+		vTaskDelay(pdMS_TO_TICKS(5000));
 	}
 }
 
 extern "C" void user_init(void)
 {
 	uart_set_baud(0, 115200);
-	i2c_init(BUS_I2C, SCL, SDA, I2C_FREQ_100K);
-	gpio_enable(SCL, GPIO_OUTPUT);
-	gpio_enable(CS_NRF, GPIO_OUTPUT);
-
+	
 	wifi_connect();	
 
-	radio.begin();
-	radio.setChannel(CHANNEL);
-	radio.openWritingPipe(address);
-	radio.powerDown();
+	i2c_init(BUS_I2C, SCL, SDA, I2C_FREQ_100K);
+	gpio_enable(SCL, GPIO_OUTPUT);
+	gpio_enable(GPIO_LED, GPIO_OUTPUT);
 
 	xTaskCreate(&bmp_task, "BMP task", 256, NULL, 2, NULL);
 }
