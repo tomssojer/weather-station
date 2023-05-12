@@ -1,0 +1,16 @@
+#!/bin/bash
+
+Makefile=Makefile-$1
+
+if [ ! -f ./$Makefile ]; then
+	echo "Specify which Makefile to use"
+	exit 0
+fi
+
+if [ $2 == "erase" ]; then
+	make -f $Makefile erase_flash
+elif [ $2 == "clean" ]; then
+	make -f $Makefile clean	
+fi
+
+make -f $Makefile flash
