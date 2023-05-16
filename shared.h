@@ -18,6 +18,11 @@
 #define SCL 14
 #define SDA 12
 
+//UART
+#define BUS_UART 0
+#define TXD 4
+#define RXD 5
+
 // nrf24
 #define CE_NRF 3
 #define CS_NRF 0
