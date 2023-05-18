@@ -39,10 +39,10 @@ static void bmp_task(void *pvParameters) {
 	
 	while (1) {
 		temperature = read_bmp(BMP280_TEMPERATURE);
-		pressure = read_bmp(BMP280_PRESSURE);
+		pressure = 0.01*read_bmp(BMP280_PRESSURE);
 
 		printf("Temperature on transmitter: %f °C\n", temperature);
-		printf("Pressure on transmitter: %f mBar\n", 0.01*pressure);		
+		printf("Pressure on transmitter: %f mBar\n", pressure);		
 
 		gpio_write(GPIO_LED, 0);
 		send_data(temperature, pressure);

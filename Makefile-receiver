@@ -1,5 +1,5 @@
 PROGRAM=weather_station
 PROGRAM_SRC_FILES=./receiver.cpp
-EXTRA_COMPONENTS = extras/RF24 extras/bmp280 extras/i2c extras/dhcpserver
+EXTRA_COMPONENTS = extras/RF24 extras/bmp280 extras/i2c extras/dhcpserver extras/softuart
 include ~/esp-open-rtos/common.mk
 

@@ -9,6 +9,7 @@
 #include "RF24/RF24.h"
 #include "bmp280/bmp280.h"
 #include "i2c/i2c.h"
+#include "softuart/softuart.h"
 
 // Wemos
 #define GPIO_LED 2

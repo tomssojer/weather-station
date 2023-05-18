@@ -6,8 +6,30 @@
 
 #include "shared.h"
 #include <dhcpserver.h>
-static float rx_data;
 
+float rx_data;
+float temperature_receiver = 0;
+float temperature_transmitter = 0;
+float pressure_receiver = 0;
+float pressure_transmitter = 0;
+char api_string[100];
+int second = 1000000;
+
+// Parse url to be usable for the api
+static void parse_url(float temperature, float pressure, int station) {
+
+	char temp_string[10], press_string[10];
+	sprintf(temp_string, "%.2f", temperature);
+	sprintf(press_string, "%.2f", pressure);
+
+
+	if (station == 0)
+		sprintf(api_string, "%s%s%s%s%s%s",  AT_CHTTPSEND, "v0=", temp_string, "&v1=", press_string, "\"");
+	else
+		sprintf(api_string, "%s%s%s%s%s%s", AT_CHTTPSEND, "v2=", temp_string, "&v3=", press_string, "\"");
+}
+
+// Set access point
 static void set_ap(void) {
 	
 	sdk_wifi_set_opmode(SOFTAP_MODE);
@@ -48,15 +70,17 @@ void receive_data_task(void *pvParameters) {
 	while (1) {
 		if (radio.available()) {
 			radio.read(&rx_data, sizeof(float));
+
 			printf("Received message: %f\n", rx_data);
 
-			gpio_write(GPIO_LED, 0);
+			if (rx_data > 800)
+				pressure_transmitter = rx_data;	
+			else
+				temperature_transmitter = rx_data;
+	
+			parse_url(temperature_transmitter, pressure_transmitter, 1);	
+			softuart_puts(0, api_string);			
 		}
-		radio.powerDown();
-		vTaskDelay(pdMS_TO_TICKS(50));
-		gpio_write(GPIO_LED, 1);
-		vTaskDelay(pdMS_TO_TICKS(50));
-		radio.powerUp();
 	}
 }
 
@@ -68,31 +92,39 @@ static void bmp_task(void *pvParameters)  {
         bmp280_dev.i2c_dev.addr = BMP280_I2C_ADDRESS_0;
         bmp280_init(&bmp280_dev, &params);
 
-        float temperature, pressure;
-
         while (1) {
 
-                vTaskDelay(pdMS_TO_TICKS(5000));
-                temperature = read_bmp(BMP280_TEMPERATURE);
-                pressure = read_bmp(BMP280_PRESSURE);
+                vTaskDelay(pdMS_TO_TICKS(10000));
+                temperature_receiver = read_bmp(BMP280_TEMPERATURE);
+                pressure_receiver = 0.01*read_bmp(BMP280_PRESSURE);
 
-                printf("Temperature on receiver: %f °C\n", temperature);
-                printf("Pressure on receiver: %f mBar\n", 0.01*pressure);
+                printf("Temperature on receiver: %f °C\n", temperature_receiver);
+                printf("Pressure on receiver: %f mBar\n", pressure_receiver);
+
+		parse_url(temperature_receiver, pressure_receiver, 0);
+		softuart_puts(0, api_string);
         }	
 
 }
 
 extern "C" void user_init(void) {
 	uart_set_baud(0, 115200);
-	
+	softuart_open(0, 9600, RXD, TXD);
+
+	// Set up connection with AT commands
+	softuart_puts(0, "AT+CGCONTRDP");	
+	sdk_os_delay_us(second);
+	softuart_puts(0, AT_CHTTPCREATE);
+	sdk_os_delay_us(second);
+	softuart_puts(0, "AT+CHTTPCON=0");
+
+	// Set up the access point
 	set_ap();
 
 	i2c_init(BUS_I2C, SCL, SDA, I2C_FREQ_100K);
 	gpio_enable(SCL, GPIO_OUTPUT);
-	gpio_enable(GPIO_LED, GPIO_OUTPUT);
-	gpio_write(GPIO_LED, 1);
-
-	xTaskCreate(&bmp_task, "Measure data", 512, NULL, 2, NULL);
-	xTaskCreate(receive_data_task, "Listen to radio for incoming data", 512, NULL, 2, NULL);	
+	
+	xTaskCreate(bmp_task, "Measure data", 512, NULL, 2, NULL);
+	xTaskCreate(receive_data_task, "Listen to radio for incoming data", 512, NULL, 2, NULL);
 }
 
